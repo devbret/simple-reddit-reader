@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Simple Reddit Reader</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                font-family: Arial, sans-serif;
+                scroll-behavior: smooth;
+            }
+
+            body {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                background-color: #f3f4f6;
+                color: #333;
+                padding: 20px;
+                min-height: 100vh;
+            }
+
+            h1 {
+                margin-top: 33px;
+                margin-bottom: 20px;
+                color: #1d4ed8;
+                font-size: 3.3rem;
+                font-weight: 600;
+                text-align: center;
+                letter-spacing: 1px;
+            }
+
+            hr {
+                color: lightgray;
+                background-color: lightgray;
+            }
+
+            #subredditInput,
+            #searchInput {
+                padding: 12px;
+                margin: 15px 8px;
+                border: 1px solid #d1d5db;
+                border-radius: 8px;
+                width: 260px;
+                outline: none;
+                font-size: 1rem;
+                transition: box-shadow 0.2s, transform 0.1s;
+            }
+
+            #subredditInput:focus,
+            #searchInput:focus {
+                box-shadow: 0 0 8px rgba(29, 78, 216, 0.5);
+                transform: scale(1.02);
+            }
+
+            #progressIndicator {
+                margin-top: 15px;
+                font-size: 23px;
+                color: darkgray;
+            }
+
+            #searchInput {
+                margin-top: 33px;
+            }
+
+            button {
+                padding: 10px 24px;
+                background-color: #1d4ed8;
+                color: #fff;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 1rem;
+                font-weight: 500;
+                transition: background-color 0.3s, box-shadow 0.2s, transform 0.1s;
+            }
+
+            button:hover {
+                background-color: #2563eb;
+                box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);
+                transform: scale(1.05);
+            }
+
+            img {
+                max-width: 100%;
+                display: black;
+            }
+
+            #postsContainer {
+                margin-top: 25px;
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(425px, 1fr));
+                gap: 25px;
+                width: 100%;
+                max-width: 1200px;
+                padding-bottom: 40px;
+            }
+
+            .post {
+                position: relative;
+                background-color: #fff;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                padding: 20px;
+                transition: transform 0.2s, box-shadow 0.2s;
+                overflow: hidden;
+                line-height: 1.6;
+            }
+
+            .post * {
+                line-height: inherit;
+            }
+
+            .post:hover {
+                transform: translateY(-6px);
+                box-shadow: 0 8px 18px rgba(0, 0, 0, 0.15);
+            }
+
+            .post-number {
+                position: absolute;
+                top: -3px;
+                right: -3px;
+                background-color: #1d4ed8;
+                color: #fff;
+                font-weight: bold;
+                border-radius: 50%;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 0.9rem;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            }
+
+            .post h2,
+            .post h1 {
+                font-size: 1.5rem;
+                color: #1d4ed8;
+                margin-bottom: 8px;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+                line-height: 1.23;
+            }
+
+            .post h1 {
+                margin-top: 10px;
+                font-size: 1.25rem;
+            }
+
+            .post-image {
+                margin: 10px 0px;
+            }
+
+            .post a {
+                text-decoration: none;
+                color: inherit;
+                transition: color 0.2s;
+            }
+
+            .post p a {
+                color: magenta;
+            }
+
+            .post a:hover {
+                color: #2563eb;
+            }
+
+            .post p {
+                font-size: 1rem;
+                line-height: 1.6;
+                color: black;
+                margin-top: 10px;
+            }
+
+            .post p strong {
+                color: black;
+            }
+
+            .post li {
+                margin-left: 15px;
+            }
+
+            p.publish-date {
+                margin-top: 0px;
+            }
+
+            p.publish-date,
+            p.publish-date strong {
+                color: darkgray;
+            }
+
+            .post-stats p,
+            .post-stats p strong {
+                color: darkgray;
+                font-size: 13px;
+                line-height: 1.3;
+            }
+
+            .md {
+                margin-bottom: 15px;
+            }
+
+            .md h1 {
+                color: black;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Simple Reddit Reader</h1>
+
+        <p>View the one hundred hottest posts from any available subreddit.</p>
+
+        <input type="text" id="subredditInput" placeholder="Enter subreddit name" />
+        <button onclick="fetchSubredditPosts()">Fetch Subreddit Posts</button>
+
+        <p id="progressIndicator" style="display: none">0 of 100 posts processed</p>
+
+        <input type="text" id="searchInput" placeholder="Search posts" oninput="searchPosts()" />
+        <label>
+            <input type="checkbox" id="negativeSentimentToggle" onclick="filterBySentiment('negative')" />
+            Show only negative sentiment posts
+        </label>
+        <label>
+            <input type="checkbox" id="positiveSentimentToggle" onclick="filterBySentiment('positive')" />
+            Show only positive sentiment posts
+        </label>
+
+        <div id="postsContainer"></div>
+
+        <script>
+            let allPosts = [];
+
+            async function fetchSubredditPosts() {
+                const subredditInput = document.getElementById('subredditInput');
+                const subreddit = subredditInput.value.trim();
+
+                if (!subreddit) {
+                    alert('Please enter a subreddit name.');
+                    return;
+                }
+
+                const progressIndicator = document.getElementById('progressIndicator');
+                progressIndicator.style.display = 'block';
+                progressIndicator.textContent = '0 of 100 posts processed';
+
+                const url = `http://127.0.0.1:5000/fetch_reddit_feed?subreddit=${subreddit}&limit=100`;
+                const postsContainer = document.getElementById('postsContainer');
+                postsContainer.innerHTML = '';
+
+                try {
+                    const response = await fetch(url);
+                    let data = await response.json();
+
+                    if (response.status === 202) {
+                        await monitorProgress(subreddit);
+                        await fetchResults(subreddit);
+                    } else if (response.ok) {
+                        if (data.length > 100) {
+                            data = data.slice(data.length - 100);
+                        }
+                        allPosts = data;
+                        displayPosts(allPosts);
+                        progressIndicator.style.display = 'none';
+                    } else {
+                        postsContainer.innerHTML = `<p>${data.error || 'Failed to load posts.'}</p>`;
+                        progressIndicator.style.display = 'none';
+                    }
+                } catch (error) {
+                    console.error('Error fetching subreddit feed:', error);
+                    postsContainer.innerHTML = '<p>Failed to load posts.</p>';
+                    progressIndicator.style.display = 'none';
+                }
+            }
+
+            async function monitorProgress(subreddit) {
+                const progressIndicator = document.getElementById('progressIndicator');
+                const eventSource = new EventSource(`http://127.0.0.1:5000/progress_stream?subreddit=${subreddit}`);
+
+                return new Promise((resolve, reject) => {
+                    eventSource.onmessage = function (event) {
+                        if (event.data === 'complete') {
+                            progressIndicator.textContent = 'Processing complete!';
+                            eventSource.close();
+                            resolve();
+                        } else if (event.data === 'unknown') {
+                            progressIndicator.textContent = 'No ongoing processing.';
+                            eventSource.close();
+                            resolve();
+                        } else {
+                            progressIndicator.textContent = `${event.data}`;
+                        }
+                    };
+
+                    eventSource.onerror = function (err) {
+                        console.error('Error receiving progress updates:', err);
+                        progressIndicator.style.display = 'none';
+                        eventSource.close();
+                        reject(err);
+                    };
+                });
+            }
+
+            async function fetchResults(subreddit) {
+                const progressIndicator = document.getElementById('progressIndicator');
+                const url = `http://127.0.0.1:5000/get_results?subreddit=${subreddit}`;
+
+                try {
+                    const response = await fetch(url);
+                    let data = await response.json();
+
+                    if (response.ok) {
+                        if (data.length > 100) {
+                            data = data.slice(data.length - 100);
+                        }
+                        allPosts = data;
+                        displayPosts(allPosts);
+                    } else {
+                        alert(data.message || 'Failed to fetch results.');
+                    }
+                } catch (error) {
+                    console.error('Error fetching results:', error);
+                } finally {
+                    progressIndicator.style.display = 'none';
+                }
+            }
+
+            function displayPosts(posts) {
+                const postsContainer = document.getElementById('postsContainer');
+                postsContainer.innerHTML = '';
+
+                posts.forEach((post, index) => {
+                    const postElement = document.createElement('div');
+                    postElement.classList.add('post');
+
+                    const postDate = new Date(post.pubDate);
+                    const formattedDate = postDate.toLocaleString(undefined, {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                    });
+
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(post.summary, 'text/html');
+
+                    const tables = doc.querySelectorAll('table');
+                    tables.forEach((table) => {
+                        const firstCell = table.querySelector('td:first-child');
+                        if (firstCell) {
+                            firstCell.remove();
+                        }
+
+                        const tds = table.querySelectorAll('td');
+                        tds.forEach((td) => {
+                            const childNodes = Array.from(td.childNodes);
+                            const mediaNodes = [];
+                            const otherNodes = [];
+
+                            function containsImage(node) {
+                                if (node.nodeType !== Node.ELEMENT_NODE) {
+                                    return false;
+                                }
+                                if (node.tagName.toLowerCase() === 'img') {
+                                    return true;
+                                }
+                                return node.querySelector('img') !== null;
+                            }
+
+                            childNodes.forEach((node) => {
+                                if (containsImage(node)) {
+                                    mediaNodes.push(node);
+                                } else {
+                                    otherNodes.push(node);
+                                }
+                            });
+
+                            td.innerHTML = '';
+
+                            mediaNodes.forEach((node) => td.appendChild(node));
+                            otherNodes.forEach((node) => td.appendChild(node));
+                        });
+                    });
+
+                    const imageRegex = /https?:\/\/[^\s"]+\.(?:jpg|jpeg|png|webp)(\?[^"]*)?/i;
+
+                    doc.body.normalize();
+
+                    function removeSubmittedBy(node) {
+                        let childNode = node.firstChild;
+                        while (childNode) {
+                            if (childNode.nodeType === Node.TEXT_NODE && childNode.textContent.includes('submitted by')) {
+                                let nodeToRemove = childNode;
+                                childNode = childNode.nextSibling;
+                                nodeToRemove.remove();
+
+                                while (
+                                    childNode &&
+                                    ((childNode.nodeType === Node.ELEMENT_NODE &&
+                                        (childNode.tagName.toLowerCase() === 'a' || childNode.tagName.toLowerCase() === 'br')) ||
+                                        (childNode.nodeType === Node.TEXT_NODE && /^\s*$/.test(childNode.textContent)))
+                                ) {
+                                    nodeToRemove = childNode;
+                                    childNode = childNode.nextSibling;
+                                    nodeToRemove.remove();
+                                }
+                            } else if (childNode.nodeType === Node.ELEMENT_NODE) {
+                                removeSubmittedBy(childNode);
+                                childNode = childNode.nextSibling;
+                            } else {
+                                childNode = childNode.nextSibling;
+                            }
+                        }
+                    }
+
+                    removeSubmittedBy(doc.body);
+
+                    const commentsLinks = doc.querySelectorAll('a');
+                    commentsLinks.forEach((link) => {
+                        if (link.textContent.trim() === '[comments]') {
+                            if (link.parentNode && link.parentNode.tagName.toLowerCase() === 'span') {
+                                link.parentNode.remove();
+                            } else {
+                                link.remove();
+                            }
+                        }
+                    });
+
+                    const linksToProcess = doc.querySelectorAll('a');
+                    linksToProcess.forEach((link) => {
+                        if (link.textContent.trim() === '[link]') {
+                            const href = link.getAttribute('href');
+                            if (href && !imageRegex.test(href)) {
+                                if (link.parentNode && link.parentNode.tagName.toLowerCase() === 'span') {
+                                    link.parentNode.remove();
+                                } else {
+                                    link.remove();
+                                }
+                            }
+                        }
+                    });
+
+                    const links = doc.querySelectorAll('a');
+                    links.forEach((link) => {
+                        const href = link.getAttribute('href');
+                        if (href && imageRegex.test(href)) {
+                            if (!link.querySelector('img')) {
+                                const img = doc.createElement('img');
+                                img.src = href;
+                                img.alt = 'Image from post';
+                                img.classList.add('post-image');
+                                link.parentNode.replaceChild(img, link);
+                            }
+                        }
+                    });
+
+                    function getTextNodes(node) {
+                        let textNodes = [];
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            textNodes.push(node);
+                        } else {
+                            node.childNodes.forEach((child) => {
+                                textNodes = textNodes.concat(getTextNodes(child));
+                            });
+                        }
+                        return textNodes;
+                    }
+
+                    const textNodes = getTextNodes(doc.body);
+                    textNodes.forEach((textNode) => {
+                        const text = textNode.textContent;
+                        if (imageRegex.test(text)) {
+                            const newHTML = text.replace(imageRegex, (url) => {
+                                return `<img src="${url}" alt="Image from post" class="post-image" />`;
+                            });
+                            const newFragment = doc.createRange().createContextualFragment(newHTML);
+                            textNode.parentNode.replaceChild(newFragment, textNode);
+                        }
+                    });
+
+                    const formattedSummary = doc.body.innerHTML;
+
+                    let emotionScores = post.emotions;
+
+                    let emotionsArray = Object.entries(emotionScores);
+
+                    let filteredEmotions = emotionsArray.filter(([emotion, score]) => score > 0);
+
+                    filteredEmotions.sort((a, b) => b[1] - a[1]);
+
+                    let emotionsDisplay = filteredEmotions.map(([emotion, score]) => `${emotion}: ${score.toFixed(2)}`).join(', ');
+
+                    if (emotionsDisplay === '') {
+                        emotionsDisplay = 'No significant emotions detected';
+                    }
+
+                    const totalWordCount = post.totalWordCount;
+                    const lexicalDiversity = (post.lexicalDiversity * 100).toFixed(2) + '%';
+                    const avgWordLength = post.avgWordLength.toFixed(2);
+                    const avgSentenceLength = post.avgSentenceLength.toFixed(2);
+
+                    postElement.innerHTML = `
+                        <div class="post-number">${index + 1}</div>
+                        <h2><a href="${post.link}" target="_blank">${post.title}</a></h2>
+                        <p class="publish-date"><strong>Published:</strong> ${formattedDate}</p>
+                        ${formattedSummary}
+                        <hr>
+                        <div class="post-stats">
+                            <p><strong>Title Sentiment:</strong> ${post.titleSentiment}</p>
+                            <p><strong>Summary Sentiment:</strong> ${post.summarySentiment}</p>
+                            <p><strong>Keywords:</strong> ${post.keywords.join(', ')}</p>
+                            <p><strong>Emotions:</strong> ${emotionsDisplay}</p>
+                            <p><strong>Total Word Count:</strong> ${totalWordCount}</p>
+                            <p><strong>Lexical Diversity:</strong> ${lexicalDiversity}</p>
+                            <p><strong>Average Word Length:</strong> ${avgWordLength} characters</p>
+                            <p><strong>Average Sentence Length:</strong> ${avgSentenceLength} words</p>
+                        </div>
+                    `;
+
+                    postsContainer.appendChild(postElement);
+                });
+            }
+
+            function searchPosts() {
+                const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+                const filteredPosts = allPosts.filter(
+                    (post) => post.title.toLowerCase().includes(searchTerm) || post.summary.toLowerCase().includes(searchTerm)
+                );
+                displayPosts(filteredPosts);
+            }
+
+            function filterBySentiment(senti) {
+                const negativeOnly = document.getElementById('negativeSentimentToggle').checked;
+                const positiveOnly = document.getElementById('positiveSentimentToggle').checked;
+                const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+                filteredPosts = allPosts.filter((post) => {
+                    const hasNegativeSentiment = post.titleSentiment == senti || post.summarySentiment == senti;
+                    const hasPositiveSentiment = post.titleSentiment == senti || post.summarySentiment == senti;
+                    const matchesSearch = post.title.toLowerCase().includes(searchTerm) || post.summary.toLowerCase().includes(searchTerm);
+
+                    if (negativeOnly && positiveOnly) {
+                        return (hasNegativeSentiment || hasPositiveSentiment) && matchesSearch;
+                    } else if (negativeOnly) {
+                        return hasNegativeSentiment && matchesSearch;
+                    } else if (positiveOnly) {
+                        return hasPositiveSentiment && matchesSearch;
+                    } else {
+                        return matchesSearch;
+                    }
+                });
+
+                displayPosts(filteredPosts);
+            }
+
+            function searchPosts() {
+                filterBySentiment();
+            }
+        </script>
+    </body>
+</html>
