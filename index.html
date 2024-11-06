@@ -36,6 +36,7 @@
             hr {
                 color: lightgray;
                 background-color: lightgray;
+                margin-top: 10px;
             }
 
             #subredditInput,
@@ -198,6 +199,18 @@
                 color: darkgray;
                 font-size: 13px;
                 line-height: 1.3;
+            }
+
+            .toggle-stats {
+                padding: 3px 6px;
+                background-color: lightgray;
+                color: #fff;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 0.66rem;
+                font-weight: 500;
+                transition: background-color 0.3s, box-shadow 0.2s, transform 0.1s;
             }
 
             .md {
@@ -509,8 +522,9 @@
                         <h2><a href="${post.link}" target="_blank">${post.title}</a></h2>
                         <p class="publish-date"><strong>Published:</strong> ${formattedDate}</p>
                         ${formattedSummary}
-                        <hr>
-                        <div class="post-stats">
+                        <button class="toggle-stats">Show Stats</button>
+                        <div class="post-stats" style="display: none;">
+                            <hr>
                             <p><strong>Title Sentiment:</strong> ${post.titleSentiment}</p>
                             <p><strong>Summary Sentiment:</strong> ${post.summarySentiment}</p>
                             <p><strong>Keywords:</strong> ${post.keywords.join(', ')}</p>
@@ -523,6 +537,19 @@
                     `;
 
                     postsContainer.appendChild(postElement);
+
+                    const toggleButton = postElement.querySelector('.toggle-stats');
+                    const postStatsDiv = postElement.querySelector('.post-stats');
+
+                    toggleButton.addEventListener('click', () => {
+                        if (postStatsDiv.style.display === 'none') {
+                            postStatsDiv.style.display = 'block';
+                            toggleButton.textContent = 'Hide Stats';
+                        } else {
+                            postStatsDiv.style.display = 'none';
+                            toggleButton.textContent = 'Show Stats';
+                        }
+                    });
                 });
             }
 
