@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, Response
+from flask import Flask, jsonify, request, Response, send_file
 from flask_cors import CORS
 import feedparser
 from textblob import TextBlob
@@ -11,6 +11,9 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 import text2emotion as te
 import threading
 import time
+import io
+import zipfile
+import requests
 
 nltk.download('stopwords')
 nltk.download('punkt')
@@ -141,6 +144,46 @@ def get_results():
             return jsonify(results_info.pop(subreddit))
         else:
             return jsonify({"message": "Results not ready"}), 202
+
+@app.route('/download_images', methods=['POST'])
+def download_images():
+    try:
+        data = request.get_json()
+        image_urls = data.get('image_urls', [])
+        if not image_urls:
+            return jsonify({'error': 'No image URLs provided.'}), 400
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            for index, url in enumerate(image_urls):
+                try:
+                    if not re.match(r'^https?://', url):
+                        continue
+
+                    response = requests.get(url, stream=True, timeout=10)
+                    response.raise_for_status()
+
+                    ext = url.split('.')[-1]
+                    if ext.lower() not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+                        ext = 'jpg'
+
+                    image_name = f'image_{index + 1}.{ext}'
+
+                    zip_file.writestr(image_name, response.content)
+                except requests.exceptions.RequestException as e:
+                    print(f'Error downloading {url}: {e}')
+                    continue
+
+        zip_buffer.seek(0)
+        return send_file(
+            zip_buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name='images.zip'
+        )
+    except Exception as e:
+        print(f"Server error: {e}")
+        return jsonify({'error': 'Internal server error.'}), 500
 
 if __name__ == '__main__':
     app.run(port=5000, threaded=True)
