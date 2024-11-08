@@ -64,7 +64,7 @@
             }
 
             #searchInput {
-                margin-top: 33px;
+                margin: 0px;
             }
 
             button {
@@ -90,9 +90,19 @@
                 display: black;
             }
 
-            .download-all-images {
+            .post-controls {
+                display: flex;
+                width: 100%;
+                align-items: center;
+                justify-content: space-around;
+                max-width: 1200px;
+                margin-top: 43px;
+                margin-bottom: 23px;
+            }
+
+            .download-all-images,
+            .download-all-content {
                 display: none;
-                margin-top: 15px;
             }
 
             #postsContainer {
@@ -247,17 +257,21 @@
 
         <p id="progressIndicator" style="display: none">0 of 100 posts processed</p>
 
-        <input style="display: none" type="text" id="searchInput" placeholder="Search posts" oninput="searchPosts()" />
-        <label style="display: none">
-            <input type="checkbox" id="negativeSentimentToggle" onclick="filterBySentiment('negative')" />
-            Show only negative sentiment posts
-        </label>
-        <label style="display: none">
-            <input type="checkbox" id="positiveSentimentToggle" onclick="filterBySentiment('positive')" />
-            Show only positive sentiment posts
-        </label>
+        <div class="post-controls">
+            <input style="display: none" type="text" id="searchInput" placeholder="Search posts" oninput="searchPosts()" />
+            <label style="display: none">
+                <input type="checkbox" id="negativeSentimentToggle" onclick="filterBySentiment('negative')" />
+                Show only negative sentiment posts
+            </label>
+            <label style="display: none">
+                <input type="checkbox" id="positiveSentimentToggle" onclick="filterBySentiment('positive')" />
+                Show only positive sentiment posts
+            </label>
 
-        <button class="download-all-images">Download All Images</button>
+            <button class="download-all-images">Download All Images</button>
+
+            <button class="download-all-content">Download All Content</button>
+        </div>
 
         <div id="postsContainer"></div>
 
@@ -274,10 +288,8 @@
                 }
 
                 document.querySelector('.download-all-images').style.display = 'none';
+                document.querySelector('.download-all-content').style.display = 'none';
                 document.querySelector('#searchInput').style.display = 'none';
-
-                const searchInput = document.querySelector('#searchInput');
-                searchInput.style.display = 'inline-block';
 
                 const progressIndicator = document.getElementById('progressIndicator');
                 progressIndicator.style.display = 'block';
@@ -393,10 +405,12 @@
                         }
                     })
                     .then((blob) => {
+                        const subredditInput = document.getElementById('subredditInput');
+                        const subreddit = subredditInput ? subredditInput.value.trim() : 'default_subreddit';
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = 'images.zip';
+                        a.download = `${subreddit}_images.zip`;
                         document.body.appendChild(a);
                         a.click();
                         a.remove();
@@ -413,6 +427,82 @@
                 downloadAllImages();
             });
 
+            function downloadAllContent() {
+                const postElements = document.querySelectorAll('.post');
+                const posts = Array.from(postElements).map((postElem) => {
+                    const titleElem = postElem.querySelector('h2 a');
+                    const title = titleElem ? titleElem.innerText.trim() : 'Untitled Post';
+
+                    const dateElem = postElem.querySelector('.publish-date');
+                    let date = 'Unknown Date';
+                    if (dateElem) {
+                        date = dateElem.innerText.replace('Published:', '').trim();
+                    }
+
+                    const contentElems = postElem.querySelectorAll('.md p');
+                    const textContent = Array.from(contentElems)
+                        .map((elem) => elem.innerText.trim())
+                        .join(' ');
+
+                    const imageElems = postElem.querySelectorAll('img');
+                    const imageUrls = Array.from(imageElems).map((img) => img.src);
+
+                    return {
+                        title: title,
+                        date: date,
+                        text_content: textContent,
+                        image_urls: imageUrls,
+                    };
+                });
+
+                const subredditInput = document.getElementById('subredditInput');
+                const subreddit = subredditInput ? subredditInput.value.trim() : 'default_subreddit';
+
+                fetch(`http://127.0.0.1:5000/download_content`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ posts: posts, subreddit: subreddit }),
+                })
+                    .then((response) => {
+                        if (response.ok) {
+                            return response.blob();
+                        } else {
+                            return response.text().then((text) => {
+                                let errMsg = 'Failed to download content.';
+                                try {
+                                    const err = JSON.parse(text);
+                                    errMsg = err.error || errMsg;
+                                } catch (e) {
+                                    console.error('Error parsing response as JSON:', e);
+                                    errMsg = text || errMsg;
+                                }
+                                throw new Error(errMsg);
+                            });
+                        }
+                    })
+                    .then((blob) => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${subreddit}_posts.zip`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        window.URL.revokeObjectURL(url);
+                    })
+                    .catch((error) => {
+                        console.error('Error:', error);
+                        alert('An error occurred while downloading content: ' + error.message);
+                    });
+            }
+
+            const downloadContentButton = document.querySelector('.download-all-content');
+            downloadContentButton.addEventListener('click', () => {
+                downloadAllContent();
+            });
+
             function getImageExtension(url) {
                 const match = url.match(/\.(jpg|jpeg|png|webp)(\?[^"]*)?$/i);
                 if (match) {
@@ -427,6 +517,8 @@
 
                 const downloadButton = document.querySelector('.download-all-images');
                 downloadButton.style.display = 'inline-block';
+
+                document.querySelector('.download-all-content').style.display = 'inline-block';
 
                 const searchInput = document.querySelector('#searchInput');
                 searchInput.style.display = 'inline-block';

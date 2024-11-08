@@ -14,6 +14,9 @@ import time
 import io
 import zipfile
 import requests
+import os
+import traceback
+from urllib.parse import urlparse, unquote
 
 nltk.download('stopwords')
 nltk.download('punkt')
@@ -154,6 +157,8 @@ def download_images():
             return jsonify({'error': 'No image URLs provided.'}), 400
 
         zip_buffer = io.BytesIO()
+        successful_downloads = False
+
         with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
             for index, url in enumerate(image_urls):
                 try:
@@ -168,11 +173,15 @@ def download_images():
                         ext = 'jpg'
 
                     image_name = f'image_{index + 1}.{ext}'
-
                     zip_file.writestr(image_name, response.content)
+                    successful_downloads = True
+
                 except requests.exceptions.RequestException as e:
                     print(f'Error downloading {url}: {e}')
                     continue
+
+        if not successful_downloads:
+            return jsonify({'error': 'No valid images found.'}), 404
 
         zip_buffer.seek(0)
         return send_file(
@@ -183,6 +192,102 @@ def download_images():
         )
     except Exception as e:
         print(f"Server error: {e}")
+        return jsonify({'error': 'Internal server error.'}), 500
+    
+@app.route('/download_content', methods=['POST'])
+def download_content():
+    try:
+        data = request.get_json()
+        posts = data.get('posts', [])
+        subreddit = data.get('subreddit', 'default_subreddit')
+        if not posts:
+            return jsonify({'error': 'No posts provided.'}), 400
+
+        zip_buffer = io.BytesIO()
+        successful_downloads = False
+
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for post_index, post in enumerate(posts):
+                try:
+                    title = post.get('title') or 'Untitled Post'
+                    pub_date = post.get('date') or 'Unknown Date'
+                    text_content = post.get('text_content') or ''
+                    image_urls = post.get('image_urls', [])
+
+                    print(f"Processing post {post_index}: {title}")
+
+                    post_has_content = False
+
+                    if isinstance(text_content, str) and text_content.strip():
+                        post_has_content = True
+
+                    images_downloaded = False
+                    images_data = []
+
+                    for index, url in enumerate(image_urls):
+                        try:
+                            if not re.match(r'^https?://', url):
+                                continue
+
+                            response = requests.get(url, stream=True, timeout=10)
+                            response.raise_for_status()
+
+                            parsed_url = urlparse(url)
+                            path = parsed_url.path
+                            filename = os.path.basename(path)
+                            name, ext = os.path.splitext(filename)
+                            ext = ext.lstrip('.').lower()
+
+                            if ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+                                ext = 'jpg'
+
+                            image_name = f"image_{index + 1}.{ext}"
+                            images_data.append({
+                                'image_name': image_name,
+                                'content': response.content
+                            })
+                            images_downloaded = True
+
+                        except requests.exceptions.RequestException as e:
+                            print(f'Error downloading {url}: {e}')
+                            continue
+
+                    print(f"Downloaded {len(images_data)} images for post {post_index}")
+
+                    if post_has_content or images_downloaded:
+                        folder_name = f"{title}_{pub_date}"
+                        folder_name = re.sub(r'[\\/*?:"<>|]', "_", folder_name)
+
+                        if post_has_content:
+                            text_file_path = os.path.join(folder_name, 'content.txt')
+                            zip_file.writestr(text_file_path, text_content)
+
+                        for image_data in images_data:
+                            image_path = os.path.join(folder_name, image_data['image_name'])
+                            zip_file.writestr(image_path, image_data['content'])
+
+                        successful_downloads = True
+
+                except Exception as e:
+                    print(f"Error processing post at index {post_index}: {e}")
+                    traceback.print_exc()
+                    continue
+
+        if not successful_downloads:
+            return jsonify({'error': 'No valid content found.'}), 404
+
+        subreddit = re.sub(r'[\\/*?:"<>|]', "_", subreddit)
+
+        zip_buffer.seek(0)
+        return send_file(
+            zip_buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f'{subreddit}_posts.zip'
+        )
+    except Exception as e:
+        print(f"Server error: {e}")
+        traceback.print_exc()
         return jsonify({'error': 'Internal server error.'}), 500
 
 if __name__ == '__main__':
