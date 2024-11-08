@@ -247,12 +247,12 @@
 
         <p id="progressIndicator" style="display: none">0 of 100 posts processed</p>
 
-        <input type="text" id="searchInput" placeholder="Search posts" oninput="searchPosts()" />
-        <label>
+        <input style="display: none" type="text" id="searchInput" placeholder="Search posts" oninput="searchPosts()" />
+        <label style="display: none">
             <input type="checkbox" id="negativeSentimentToggle" onclick="filterBySentiment('negative')" />
             Show only negative sentiment posts
         </label>
-        <label>
+        <label style="display: none">
             <input type="checkbox" id="positiveSentimentToggle" onclick="filterBySentiment('positive')" />
             Show only positive sentiment posts
         </label>
@@ -274,6 +274,10 @@
                 }
 
                 document.querySelector('.download-all-images').style.display = 'none';
+                document.querySelector('#searchInput').style.display = 'none';
+
+                const searchInput = document.querySelector('#searchInput');
+                searchInput.style.display = 'inline-block';
 
                 const progressIndicator = document.getElementById('progressIndicator');
                 progressIndicator.style.display = 'block';
@@ -404,6 +408,11 @@
                     });
             }
 
+            const downloadButton = document.querySelector('.download-all-images');
+            downloadButton.addEventListener('click', () => {
+                downloadAllImages();
+            });
+
             function getImageExtension(url) {
                 const match = url.match(/\.(jpg|jpeg|png|webp)(\?[^"]*)?$/i);
                 if (match) {
@@ -419,9 +428,8 @@
                 const downloadButton = document.querySelector('.download-all-images');
                 downloadButton.style.display = 'inline-block';
 
-                downloadButton.addEventListener('click', () => {
-                    downloadAllImages();
-                });
+                const searchInput = document.querySelector('#searchInput');
+                searchInput.style.display = 'inline-block';
 
                 posts.forEach((post, index) => {
                     const postElement = document.createElement('div');
