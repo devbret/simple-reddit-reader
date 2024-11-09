@@ -200,12 +200,15 @@
                 margin-left: 20px;
             }
 
-            p.publish-date {
+            p.publish-date,
+            p.publish-user {
                 margin-top: 0px;
             }
 
             p.publish-date,
-            p.publish-date strong {
+            p.publish-user,
+            p.publish-date strong,
+            p.publish-user strong {
                 color: darkgray;
                 font-size: 13px;
             }
@@ -584,6 +587,8 @@
 
                     doc.body.normalize();
 
+                    let username;
+
                     function removeSubmittedBy(node) {
                         let childNode = node.firstChild;
                         while (childNode) {
@@ -598,6 +603,9 @@
                                         (childNode.tagName.toLowerCase() === 'a' || childNode.tagName.toLowerCase() === 'br')) ||
                                         (childNode.nodeType === Node.TEXT_NODE && /^\s*$/.test(childNode.textContent)))
                                 ) {
+                                    if (String(nodeToRemove.textContent).includes('/u/')) {
+                                        username = String(nodeToRemove.textContent).split('/')[2];
+                                    }
                                     nodeToRemove = childNode;
                                     childNode = childNode.nextSibling;
                                     nodeToRemove.remove();
@@ -729,6 +737,7 @@
                         <div class="post-number">${index + 1}</div>
                         <h2><a href="${post.link}" target="_blank">${post.title}</a></h2>
                         <p class="publish-date"><strong>Published:</strong> ${formattedDate}</p>
+                        <p class="publish-user"><strong>Published By:</strong> <a href="https://www.reddit.com/user/${username}" target="_blank">${username}</a></p>
                         ${formattedSummary}
                         <button class="toggle-stats">Show Stats</button>
                         <div class="post-stats" style="display: none;">
