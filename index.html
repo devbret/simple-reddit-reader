@@ -750,6 +750,9 @@
                             <p><strong>Lexical Diversity:</strong> ${lexicalDiversity}</p>
                             <p><strong>Average Word Length:</strong> ${avgWordLength} characters</p>
                             <p><strong>Average Sentence Length:</strong> ${avgSentenceLength} words</p>
+                            <p><strong>Reading Ease:</strong> ${post.fleschReadingEase}</p>
+                            <p><strong>Grade Level:</strong> ${Math.round(post.fleschKincaidGrade)}</p>
+                            <p><strong>Topics:</strong> ${post.topics.join(', ')}</p>
                         </div>
                     `;
 

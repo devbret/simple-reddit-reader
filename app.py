@@ -17,6 +17,9 @@ import requests
 import os
 import traceback
 from urllib.parse import urlparse, unquote
+from textstat import textstat
+from gensim import corpora
+from gensim.models import LdaModel
 
 nltk.download('stopwords')
 nltk.download('punkt')
@@ -28,6 +31,36 @@ CORS(app)
 progress_info = {}
 results_info = {}
 lock = threading.Lock()
+
+def preprocess_text(text):
+    tokens = word_tokenize(text.lower())
+    tokens = [token for token in tokens if token.isalnum() and token not in stop_words]
+    return tokens
+
+def get_topics(text, num_topics=3, num_words=3):
+    processed_text = preprocess_text(text)
+    if not processed_text:
+        return []
+
+    dictionary = corpora.Dictionary([processed_text])
+    corpus = [dictionary.doc2bow(processed_text)]
+    
+    lda_model = LdaModel(corpus, num_topics=num_topics, id2word=dictionary, passes=10)
+    
+    topics = []
+    used_words = set()
+    
+    for idx, topic in lda_model.show_topics(formatted=False, num_words=num_words):
+        unique_topic_words = []
+        for word, _ in topic:
+            if word not in used_words:
+                unique_topic_words.append(word)
+                used_words.add(word)
+        if unique_topic_words:
+            topics.append(", ".join(unique_topic_words))
+    
+    return topics
+
 
 def process_feed(subreddit, limit):
     try:
@@ -73,6 +106,16 @@ def process_feed(subreddit, limit):
             word_counts = Counter(filtered_words)
             top_words = [word for word, count in word_counts.most_common(13)]
 
+            if summary_text:
+                flesch_reading_ease = textstat.flesch_reading_ease(summary_text)
+                flesch_kincaid_grade = textstat.flesch_kincaid_grade(summary_text)
+                
+                topics = get_topics(summary_text)
+            else:
+                flesch_reading_ease = None
+                flesch_kincaid_grade = None
+                topics = []
+
             post = {
                 'subreddit': subreddit,
                 'title': entry.title,
@@ -86,7 +129,10 @@ def process_feed(subreddit, limit):
                 'totalWordCount': num_words,
                 'lexicalDiversity': lexical_diversity,
                 'avgWordLength': avg_word_length,
-                'avgSentenceLength': avg_sentence_length
+                'avgSentenceLength': avg_sentence_length,
+                'fleschReadingEase': flesch_reading_ease,
+                'fleschKincaidGrade': flesch_kincaid_grade,
+                'topics': topics
             }
             posts.append(post)
 
